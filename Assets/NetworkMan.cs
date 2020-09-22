@@ -13,8 +13,14 @@ public class NetworkMan : MonoBehaviour
     void Start()
     {
         udp = new UdpClient();
-        
-        udp.Connect("PUT_IP_ADDRESS_HERE",12345);
+
+        bool useLocalhost = true;
+        string IPADD = "3.137.148.38";
+
+        if (useLocalhost)
+            IPADD = "localhost";
+
+        udp.Connect(IPADD, 12345);
 
         Byte[] sendBytes = Encoding.ASCII.GetBytes("connect");
       

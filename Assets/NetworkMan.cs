@@ -7,13 +7,13 @@ using System.Net.Sockets;
 using System.Net;
 using Unity.Mathematics;
 using System.Security.Cryptography;
-
+//using UnityEditor.Networking.PlayerConnection;
 
 public class NetworkMan : MonoBehaviour
 {
     List<GameObject> AllPlayers = new List<GameObject>();
     Player ThisPlayer = new Player();
-    int NPlayersCount = 0;
+    bool Joined = false;
 
     // The player prefab
     [SerializeField]
@@ -116,7 +116,7 @@ public class NetworkMan : MonoBehaviour
             switch(latestMessage.cmd){
                 case commands.NEW_CLIENT:
                     NPlayer = JsonUtility.FromJson<NewPlayer>(returnData);
-                    NPlayersCount++;
+                    Joined = true;
                     break;
                 case commands.UPDATE:
                     lastestGameState = JsonUtility.FromJson<GameState>(returnData);
@@ -140,31 +140,67 @@ public class NetworkMan : MonoBehaviour
         socket.BeginReceive(new AsyncCallback(OnReceived), socket);
     }
 
+    bool PlayerInGame(Player player)
+    {
+        foreach (GameObject p in AllPlayers)
+        {
+            if(p.GetComponent<NetInfo>().ID == player.id)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     void SpawnPlayers()
     {
-
-        if (NPlayersCount > 0)
+        if(Joined)
         {
-            int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
-            GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
-            playerObj.GetComponent<NetInfo>().ID = NPlayer.player.id;
-            AllPlayers.Add(playerObj);
-            NPlayersCount--;
-        }
-        else
-        {
-            if (connectedPlayers.players.Length > AllPlayers.Count)
+            if (!PlayerInGame(NPlayer.player))
             {
-                foreach (Player p in connectedPlayers.players)
-                {
-                    int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
-                    GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
-                    playerObj.GetComponent<NetInfo>().ID = p.id;
-                    AllPlayers.Add(playerObj);
-                }
+                int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
+                GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
+                playerObj.GetComponent<NetInfo>().ID = NPlayer.player.id;
+                AllPlayers.Add(playerObj);
+                Joined = false;
             }
         }
+
+        foreach (Player p in connectedPlayers.players)
+        {
+            if(!PlayerInGame(p))
+            {
+                int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
+                GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
+                Debug.Log(p.id);
+                playerObj.GetComponent<NetInfo>().ID = p.id;
+                AllPlayers.Add(playerObj);
+            }
+        }
+
+
+        //if (NPlayersCount > 0)
+        //{
+        //    int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
+        //    GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
+        //    playerObj.GetComponent<NetInfo>().ID = NPlayer.player.id;
+        //    AllPlayers.Add(playerObj);
+        //    NPlayersCount--;
+        //}
+        //else
+        //{
+        //    if (connectedPlayers.players.Length > AllPlayers.Count)
+        //    {
+        //        foreach (Player p in connectedPlayers.players)
+        //        {
+        //            int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
+        //            GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
+        //            playerObj.GetComponent<NetInfo>().ID = p.id;
+        //            AllPlayers.Add(playerObj);
+        //        }
+        //    }
+        //}
 
         //if (lastestGameState.players.Length > AllPlayers.Count)
         //{

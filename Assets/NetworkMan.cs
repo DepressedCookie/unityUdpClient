@@ -86,17 +86,28 @@ public class NetworkMan : MonoBehaviour
         public Player player;
     }
 
+    [Serializable]
+    public class DCPlayer
+    {
+        public Player player;
+    }
 
     [Serializable]
     public class GameState{
         public Player[] players;
     }
 
+    [Serializable]
+    public class EveryPlayer
+    {
+        public Player[] players;
+    }
+
     public Message latestMessage;
     public NewPlayer NPlayer;
     public GameState lastestGameState;
-    public GameState connectedPlayers;
-    public Player DCPlayer;
+    public EveryPlayer connectedPlayers;
+    public DCPlayer DCP;
     void OnReceived(IAsyncResult result){
         // this is what had been passed into BeginReceive as the second parameter:
         UdpClient socket = result.AsyncState as UdpClient;
@@ -122,10 +133,10 @@ public class NetworkMan : MonoBehaviour
                     lastestGameState = JsonUtility.FromJson<GameState>(returnData);
                     break;
                 case commands.DISCONNECT:
-                    DCPlayer = JsonUtility.FromJson<Player>(returnData);
+                    DCP = JsonUtility.FromJson<DCPlayer>(returnData);
                     break;
                 case commands.OLD_CLIENT:
-                    connectedPlayers = JsonUtility.FromJson<GameState>(returnData);
+                    connectedPlayers = JsonUtility.FromJson<EveryPlayer>(returnData);
                     break;
                 default:
                     Debug.Log("Error");
@@ -144,7 +155,7 @@ public class NetworkMan : MonoBehaviour
     {
         foreach (GameObject p in AllPlayers)
         {
-            if(p.GetComponent<NetInfo>().ID == player.id)
+            if (p.GetComponent<NetInfo>().ID == player.id)
             {
                 return true;
             }
@@ -152,15 +163,27 @@ public class NetworkMan : MonoBehaviour
         return false;
     }
 
+    GameObject FindPlayerInGame(Player player)
+    {
+        foreach (GameObject p in AllPlayers)
+        {
+            if (p.GetComponent<NetInfo>().ID == player.id)
+            {
+                return p;
+            }
+        }
+        return null;
+    }
 
     void SpawnPlayers()
     {
-        if(Joined)
+        if (Joined)
         {
             if (!PlayerInGame(NPlayer.player))
             {
                 int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
-                GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
+                Vector3 RandomDeltaPositon = new Vector3(UnityEngine.Random.Range(.2f, .5f), 0, UnityEngine.Random.Range(.2f, .5f));
+                GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position + RandomDeltaPositon, Quaternion.identity);
                 playerObj.GetComponent<NetInfo>().ID = NPlayer.player.id;
                 AllPlayers.Add(playerObj);
                 Joined = false;
@@ -172,66 +195,12 @@ public class NetworkMan : MonoBehaviour
             if(!PlayerInGame(p))
             {
                 int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
-                GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
-                Debug.Log(p.id);
+                Vector3 RandomDeltaPositon = new Vector3(UnityEngine.Random.Range(.2f, .5f), 0, UnityEngine.Random.Range(.2f, .5f));
+                GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position + RandomDeltaPositon, Quaternion.identity);
                 playerObj.GetComponent<NetInfo>().ID = p.id;
                 AllPlayers.Add(playerObj);
             }
         }
-
-
-        //if (NPlayersCount > 0)
-        //{
-        //    int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
-        //    GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
-        //    playerObj.GetComponent<NetInfo>().ID = NPlayer.player.id;
-        //    AllPlayers.Add(playerObj);
-        //    NPlayersCount--;
-        //}
-        //else
-        //{
-        //    if (connectedPlayers.players.Length > AllPlayers.Count)
-        //    {
-        //        foreach (Player p in connectedPlayers.players)
-        //        {
-        //            int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
-        //            GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
-        //            playerObj.GetComponent<NetInfo>().ID = p.id;
-        //            AllPlayers.Add(playerObj);
-        //        }
-        //    }
-        //}
-
-        //if (lastestGameState.players.Length > AllPlayers.Count)
-        //{
-        //    foreach (Player p in lastestGameState.players)
-        //    {
-        //        if (p.id != ThisPlayer.id)
-        //        {
-        //            int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
-        //            GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
-        //            playerObj.GetComponent<NetInfo>().ID = p.id;
-        //            AllPlayers.Add(playerObj);
-        //            ThisPlayer = p;
-        //        }
-        //    }
-        //}
-        //else
-        //{
-        //    if (NPlayer != null)
-        //    {
-        //        Player p = NPlayer.player;
-        //        if (p.id.Length > 0 && ThisPlayer != p)
-        //        {
-        //            Debug.Log("Net: " + p.id + " New: " + NPlayer.player.id);
-        //            int RandomPoint = UnityEngine.Random.Range(0, SpawnPoints.Length);
-        //            GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position, Quaternion.identity);
-        //            playerObj.GetComponent<NetInfo>().ID = p.id;
-        //            AllPlayers.Add(playerObj);
-        //            ThisPlayer = p;
-        //        }
-        //    }
-        //}
 
     }
 
@@ -250,8 +219,14 @@ public class NetworkMan : MonoBehaviour
         }
     }
 
-    void DestroyPlayers(){
-
+    void DestroyPlayers()
+    {
+        if (PlayerInGame(DCP.player))
+        {
+            GameObject foundPlayer = FindPlayerInGame(DCP.player);
+            AllPlayers.Remove(foundPlayer);
+            Destroy(foundPlayer);
+        }
     }
     
     void HeartBeat(){

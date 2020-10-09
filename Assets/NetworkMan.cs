@@ -5,14 +5,12 @@ using System;
 using System.Text;
 using System.Net.Sockets;
 using System.Net;
-using Unity.Mathematics;
-using System.Security.Cryptography;
-//using UnityEditor.Networking.PlayerConnection;
+using JetBrains.Annotations;
 
 public class NetworkMan : MonoBehaviour
 {
     List<GameObject> AllPlayers = new List<GameObject>();
-    Player ThisPlayer = new Player();
+    Player ThisPlayer;
     bool Joined = false;
 
     // The player prefab
@@ -44,7 +42,8 @@ public class NetworkMan : MonoBehaviour
 
         udp.BeginReceive(new AsyncCallback(OnReceived), udp);
 
-        InvokeRepeating("HeartBeat", 1, 1);
+        InvokeRepeating("HeartBeat", 1, 0.0333f);
+        InvokeRepeating("UpdatePosition", 2, 1.0333f);
     }
 
     void SetupSpawnPoints()
@@ -73,12 +72,13 @@ public class NetworkMan : MonoBehaviour
     public class Player{
         [Serializable]
         public struct receivedColor{
-            public float R;
-            public float G;
-            public float B;
+            public float x;
+            public float y;
+            public float z;
         }
         public string id;
         public receivedColor color;
+        public Vector3 location;
     }
 
     [Serializable]
@@ -186,6 +186,7 @@ public class NetworkMan : MonoBehaviour
                 GameObject playerObj = Instantiate(PlayerPrefab, SpawnPoints[RandomPoint].transform.position + RandomDeltaPositon, Quaternion.identity);
                 playerObj.GetComponent<NetInfo>().ID = NPlayer.player.id;
                 AllPlayers.Add(playerObj);
+                ThisPlayer = NPlayer.player;
                 Joined = false;
             }
         }
@@ -206,6 +207,11 @@ public class NetworkMan : MonoBehaviour
 
     void UpdatePlayers()
     {
+
+    }
+
+    void UpdatePosition()
+    {
         foreach (Player p in lastestGameState.players)
         {
             foreach (GameObject PO in AllPlayers)
@@ -213,7 +219,8 @@ public class NetworkMan : MonoBehaviour
                 //Debug.Log(p.id + " and " + PO.GetComponent<NetInfo>().ID);
                 if (p.id.Equals(PO.GetComponent<NetInfo>().ID))
                 {
-                    PO.GetComponent<NetInfo>().UpdateMat(new Color(p.color.R, p.color.G, p.color.B));
+                    PO.transform.position = p.location;
+                    //Debug.Log(p.location);
                 }
             }
         }
@@ -228,10 +235,19 @@ public class NetworkMan : MonoBehaviour
             Destroy(foundPlayer);
         }
     }
-    
-    void HeartBeat(){
+
+    void HeartBeat()
+    {
         Byte[] sendBytes = Encoding.ASCII.GetBytes("heartbeat");
         udp.Send(sendBytes, sendBytes.Length);
+
+
+        if (FindPlayerInGame(ThisPlayer) != null)
+        {
+            Byte[] locationSend = Encoding.ASCII.GetBytes(JsonUtility.ToJson(FindPlayerInGame(ThisPlayer).transform.position));
+            udp.Send(locationSend, locationSend.Length);
+        }
+
     }
 
     void Update(){
